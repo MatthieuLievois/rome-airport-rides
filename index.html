@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rome Airport Rides</title>
+<style>
+  :root {
+    --bg: #f6f1e8;
+    --surface: #fffdf9;
+    --ink: #2b2620;
+    --ink-soft: #6e6559;
+    --line: #e2d9cb;
+    --field: #ffffff;
+    --field-border: #d8cfc0;
+    --focus: #2b2620;
+    --good: #1f8a4c;
+    --good-bg: #dff5e6;
+    --full: #8a8177;
+    --full-bg: #ece6dc;
+    --warn: #b3261e;
+    --warn-bg: #fbe4e2;
+    --day23: #7a3e9d;
+    --day23-bg: #f0e4f7;
+    --day24: #0f7c8c;
+    --day24-bg: #dcf2f5;
+    --car1: #c2542d;
+    --car2: #5f7a22;
+    --car3: #2c5aa0;
+    --car4: #b8860b;
+    --wait: #8a8177;
+    --shadow: 0 1px 2px rgba(43,38,32,.06), 0 6px 18px rgba(43,38,32,.07);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1b1815;
+      --surface: #262220;
+      --ink: #f1ebe2;
+      --ink-soft: #b3a99b;
+      --line: #3a342e;
+      --field: #1f1c19;
+      --field-border: #4a423a;
+      --focus: #f1ebe2;
+      --good: #5ad489;
+      --good-bg: #163a25;
+      --full: #a89e92;
+      --full-bg: #332e29;
+      --warn: #ff8a80;
+      --warn-bg: #4a1f1c;
+      --day23: #d3a6ee;
+      --day23-bg: #3a2647;
+      --day24: #7fd6e3;
+      --day24-bg: #123a41;
+      --car1: #d86b43;
+      --car2: #7c9a35;
+      --car3: #4b7bc8;
+      --car4: #d2a12a;
+      --wait: #a89e92;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.3);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.4;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 16px 14px 48px; }
+
+  /* ---------- Header ---------- */
+  header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 20px; margin-bottom: 14px; }
+  h1 { font-size: 26px; line-height: 1.1; margin: 0; letter-spacing: -.01em; }
+  h1 small { display: block; font-size: 14px; font-weight: 500; color: var(--ink-soft); margin-top: 4px; letter-spacing: 0; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .sync { font-size: 12px; font-weight: 700; color: var(--ink-soft); padding: 6px 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); white-space: nowrap; }
+  .sync.ok { color: var(--good); border-color: var(--good); }
+  .sync.err { color: var(--warn); border-color: var(--warn); }
+  button {
+    font: inherit; cursor: pointer; border-radius: 10px; border: 1px solid var(--field-border);
+    background: var(--surface); color: var(--ink); padding: 9px 14px; font-weight: 600; font-size: 14px;
+    box-shadow: var(--shadow);
+  }
+  button.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  button:active { transform: translateY(1px); }
+
+  /* ---------- Summary strip ---------- */
+  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; box-shadow: var(--shadow); border-left: 5px solid var(--line); }
+  .stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-soft); font-weight: 700; }
+  .stat .value { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 2px; line-height: 1.1; }
+  .stat .value .sub { font-size: 13px; font-weight: 600; color: var(--ink-soft); margin-left: 4px; }
+  .stat.d23 { border-left-color: var(--day23); }
+  .stat.d24 { border-left-color: var(--day24); }
+  .stat.seats { border-left-color: var(--good); }
+  .stat.waiting { border-left-color: var(--warn); }
+  .stat.waiting.none { border-left-color: var(--good); }
+
+  /* ---------- Cars grid ---------- */
+  .cars { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 1000px) { .cars { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 560px)  { .cars { grid-template-columns: 1fr; } }
+
+  .car { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow); border: 1px solid var(--line); overflow: hidden; display: flex; flex-direction: column; }
+  .car-head { background: var(--car); color: #fff; padding: 12px 14px 12px; }
+  .car-head .eyebrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; opacity: .95; }
+  .seats-badge { display: inline-flex; align-items: center; gap: 6px; background: var(--good-bg); color: var(--good); border-radius: 999px; padding: 4px 10px; font-size: 13px; font-weight: 800; letter-spacing: 0; text-transform: none; white-space: nowrap; }
+  .seats-badge.full { background: var(--full-bg); color: var(--full); }
+  .car-head input {
+    width: 100%; background: transparent; border: 0; border-bottom: 1.5px dashed rgba(255,255,255,.55); color: #fff;
+    font: inherit; padding: 4px 0; margin-top: 4px; border-radius: 0;
+  }
+  .car-head input::placeholder { color: rgba(255,255,255,.72); }
+  .car-head input.driver-name { font-size: 20px; font-weight: 800; margin-top: 6px; }
+  .car-head input.car-model { font-size: 13px; font-weight: 500; }
+  .car-head input:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .seat-dots { display: flex; gap: 5px; margin-top: 10px; }
+  .seat-dots span { width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,.35); }
+  .seat-dots span.taken { background: #fff; }
+
+  .slots { padding: 10px 10px 4px; display: flex; flex-direction: column; gap: 6px; min-height: 60px; }
+  .slots.over { background: color-mix(in srgb, var(--car) 12%, transparent); border-radius: 12px; }
+
+  /* ---------- Bubbles (driver + passengers) ---------- */
+  .bubble { display: grid; grid-template-columns: 26px 1fr auto; grid-template-rows: auto auto; column-gap: 6px; row-gap: 5px; padding: 8px 8px 8px 6px; border-radius: 12px; border: 1px solid var(--line); background: var(--field); position: relative; }
+  .bubble.driver { border-color: var(--car); border-width: 2px; background: color-mix(in srgb, var(--car) 9%, var(--field)); }
+  .bubble.passenger { border-left: 5px solid var(--car); }
+  .bubble.dragging { opacity: .4; }
+  .bubble .emoji { font-size: 18px; line-height: 1; align-self: center; text-align: center; grid-row: 1; }
+  .bubble .name { grid-column: 2; grid-row: 1; width: 100%; min-width: 0; font: inherit; font-weight: 700; font-size: 15px; border: 0; background: transparent; color: var(--ink); padding: 2px 0; border-bottom: 1px solid transparent; border-radius: 0; }
+  .bubble .name::placeholder { font-weight: 500; color: var(--ink-soft); }
+  .bubble .name:focus-visible { outline: none; border-bottom-color: var(--ink); }
+  .bubble .tools { grid-column: 3; grid-row: 1; display: flex; align-items: center; gap: 4px; }
+  .bubble .handle { cursor: grab; color: var(--ink-soft); font-size: 18px; line-height: 1; padding: 2px 4px; user-select: none; -webkit-user-select: none; touch-action: none; }
+  .bubble .handle:active { cursor: grabbing; }
+  .bubble .del { border: 0; box-shadow: none; background: transparent; color: var(--ink-soft); padding: 2px 6px; font-size: 15px; line-height: 1; border-radius: 6px; }
+  .bubble .del:hover { background: var(--warn-bg); color: var(--warn); }
+  .bubble .meta { grid-column: 2 / 4; grid-row: 2; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .day-toggle { display: inline-flex; border-radius: 8px; overflow: hidden; border: 1px solid var(--field-border); }
+  .day-toggle button { border: 0; border-radius: 0; box-shadow: none; padding: 4px 8px; font-size: 12px; font-weight: 700; background: var(--field); color: var(--ink-soft); }
+  .day-toggle button + button { border-left: 1px solid var(--field-border); }
+  .day-toggle button.on23 { background: var(--day23); color: #fff; }
+  .day-toggle button.on24 { background: var(--day24); color: #fff; }
+  .bubble input[type="time"] { font: inherit; font-size: 13px; font-weight: 600; padding: 3px 6px; border: 1px solid var(--field-border); border-radius: 8px; background: var(--field); color: var(--ink); font-variant-numeric: tabular-nums; min-width: 86px; }
+  .bubble .lands { font-size: 12px; color: var(--ink-soft); }
+  .bubble select.move { font: inherit; font-size: 12px; font-weight: 700; padding: 4px 6px; border: 1px solid var(--field-border); border-radius: 8px; background: var(--surface); color: var(--ink); max-width: 100%; }
+  .bubble.incomplete .name { border-bottom-color: var(--warn); border-bottom-style: dashed; }
+
+  .empty-slot { border: 1.5px dashed var(--field-border); border-radius: 12px; padding: 10px; text-align: center; color: var(--ink-soft); font-size: 13px; }
+  .empty-slot.over { border-color: var(--car); background: color-mix(in srgb, var(--car) 12%, transparent); color: var(--ink); }
+
+  .notes { padding: 6px 10px 12px; }
+  .notes label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-soft); margin-bottom: 5px; }
+  .notes textarea { width: 100%; min-height: 96px; resize: vertical; font: inherit; font-size: 14px; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--field-border); background: var(--field); color: var(--ink); line-height: 1.4; }
+
+  /* ---------- Waiting area ---------- */
+  .pool { margin-top: 18px; background: var(--surface); border: 2px dashed var(--field-border); border-radius: 16px; padding: 14px; --car: var(--wait); }
+  .pool.has { border-color: var(--warn); }
+  .pool.over { background: var(--full-bg); }
+  .pool .head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; margin-bottom: 10px; }
+  .pool h2 { font-size: 17px; margin: 0; }
+  .pool p.hint { margin: 4px 0 0; font-size: 13px; color: var(--ink-soft); }
+  .pool .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 8px; min-height: 48px; }
+  .pool .none { color: var(--ink-soft); font-size: 14px; padding: 8px 2px; }
+  .pool .bubble.passenger { border-left-color: var(--wait); }
+
+  /* ---------- Arrivals timeline ---------- */
+  .timeline { margin-top: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 14px; }
+  .timeline h2 { font-size: 17px; margin: 0 0 4px; }
+  .timeline p.hint { margin: 0 0 12px; font-size: 13px; color: var(--ink-soft); }
+  .days { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 14px; }
+  .day h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 8px; padding: 6px 10px; border-radius: 8px; display: inline-block; }
+  .day.d23 h3 { background: var(--day23-bg); color: var(--day23); }
+  .day.d24 h3 { background: var(--day24-bg); color: var(--day24); }
+  .arrivals { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .arrivals li { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; border-left: 5px solid var(--car); background: color-mix(in srgb, var(--car) 9%, var(--surface)); font-size: 14px; }
+  .arrivals li.nocar { --car: var(--warn); }
+  .arrivals li .t { font-weight: 800; font-variant-numeric: tabular-nums; }
+  .arrivals li .t.none { color: var(--ink-soft); font-weight: 600; font-size: 12px; }
+  .arrivals li .who { font-weight: 600; }
+  .arrivals li .car-tag { font-size: 12px; font-weight: 700; color: var(--car); white-space: nowrap; text-align: right; }
+  @media (max-width: 420px) { .arrivals li { grid-template-columns: 52px minmax(0, 1fr); row-gap: 0; } .arrivals li .t { grid-row: 1 / 3; } .arrivals li .car-tag { grid-column: 2; text-align: left; white-space: normal; } }
+  .arrivals li .who { min-width: 0; overflow-wrap: anywhere; }
+  .arrivals li.empty { border-left-color: var(--line); background: transparent; color: var(--ink-soft); grid-template-columns: 1fr; font-size: 13px; }
+  .unset { margin-top: 10px; font-size: 13px; color: var(--ink-soft); }
+  .unset strong { color: var(--ink); }
+
+  /* ---------- Footer / toast / modal ---------- */
+  footer { margin-top: 18px; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
+  .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-weight: 700; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; box-shadow: var(--shadow); z-index: 30; max-width: 92vw; text-align: center; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 20; }
+  .modal.open { display: flex; }
+  .modal .box { background: var(--surface); color: var(--ink); border-radius: 14px; padding: 16px; width: min(640px, 100%); max-height: 90vh; display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow); }
+  .modal h2 { margin: 0; font-size: 17px; }
+  .modal p { margin: 0; font-size: 14px; color: var(--ink-soft); }
+  .modal textarea { width: 100%; min-height: 240px; font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; padding: 10px; border-radius: 10px; border: 1px solid var(--field-border); background: var(--field); color: var(--ink); resize: vertical; }
+  .modal .row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+  .ghost { position: fixed; pointer-events: none; z-index: 40; opacity: .9; transform: translate(-50%, -50%) rotate(-2deg); box-shadow: 0 10px 30px rgba(0,0,0,.25); width: 240px; }
+  @media (prefers-reduced-motion: reduce) { .toast { transition: none; } button:active { transform: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🛬 Rome Airport Rides <small>Fiumicino ✈️ → the venue · Wed 23 &amp; Thu 24 September · about 30 min drive</small></h1>
+    <div class="actions">
+      <span class="sync" id="sync" role="status" aria-live="polite">☁️ Connecting…</span>
+      <button type="button" id="btn-add" class="primary">➕ Add a passenger</button>
+      <button type="button" id="btn-export">📋 Copy for WhatsApp</button>
+      <button type="button" id="btn-reset">🗑️ Clear all</button>
+    </div>
+  </header>
+
+  <section class="summary" aria-label="Summary">
+    <div class="stat seats"><div class="label">💺 Seats free</div><div class="value"><span id="s-free">16</span><span class="sub">of 16</span></div></div>
+    <div class="stat waiting none" id="stat-waiting"><div class="label">🙋 Waiting for a seat</div><div class="value"><span id="s-wait">0</span></div></div>
+    <div class="stat d23"><div class="label">Wed 23 Sept</div><div class="value"><span id="s-23">0</span><span class="sub">arriving</span></div></div>
+    <div class="stat d24"><div class="label">Thu 24 Sept</div><div class="value"><span id="s-24">0</span><span class="sub">arriving</span></div></div>
+  </section>
+
+  <section class="cars" id="cars" aria-label="Cars"></section>
+
+  <section class="pool" id="waiting" aria-label="Passengers waiting for a seat">
+    <div class="head">
+      <div>
+        <h2>🙋 Waiting for a seat</h2>
+        <p class="hint">Add yourself here with your landing day and time. Then drag your bubble into a car, or use the “Move to” menu on your phone.</p>
+      </div>
+      <button type="button" id="btn-add-2">➕ Add a passenger</button>
+    </div>
+    <div class="grid" id="waiting-grid"></div>
+  </section>
+
+  <section class="timeline" aria-label="Arrivals timeline">
+    <h2>🕐 Who lands when</h2>
+    <p class="hint">Everyone sorted by landing time, with their car. Check that a driver is around for each landing.</p>
+    <div class="days">
+      <div class="day d23"><h3>Wed 23 September</h3><ul class="arrivals" id="list-23"></ul></div>
+      <div class="day d24"><h3>Thu 24 September</h3><ul class="arrivals" id="list-24"></ul></div>
+    </div>
+    <div class="unset" id="unset"></div>
+  </section>
+
+  <footer>
+    🔑 = driver · 🧳 = passenger · ⠿ = drag handle. This is one shared board: what you type is saved online within a second or two, and everyone who opens the link sees the same thing. If you are offline, your changes stay on this device and are sent as soon as you are back. <strong>Copy for WhatsApp</strong> gives you the whole board as plain text.
+  </footer>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="box">
+    <h2 id="modal-title">Title</h2>
+    <p id="modal-text"></p>
+    <textarea id="modal-area" spellcheck="false"></textarea>
+    <div class="row">
+      <button type="button" id="modal-cancel">Close</button>
+      <button type="button" id="modal-ok" class="primary">OK</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var KEY = 'rome-airport-rides-v2';
+  var SYNC_URL = 'https://hook.eu1.make.com/a9zytn2hlmi699o49dvtukrwzq2s68eb';
+  var CAR_COLORS = ['var(--car1)', 'var(--car2)', 'var(--car3)', 'var(--car4)'];
+  var DAYS = { '23': 'Wed 23', '24': 'Thu 24' };
+  var SEATS = 4;
+
+  // ---------- State ----------
+  function blankCar() { return { driver: '', model: '', notes: '', day: '', time: '' }; }
+  function blankState() { return { cars: [blankCar(), blankCar(), blankCar(), blankCar()], passengers: [], updatedAt: 0 }; }
+  function uid() { return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function validDay(d) { return (d === '23' || d === '24') ? d : ''; }
+  function validTime(t) { return /^\d{2}:\d{2}$/.test(t || '') ? t : ''; }
+
+  function sanitize(raw) {
+    var s = blankState();
+    if (!raw || typeof raw !== 'object') return s;
+    for (var i = 0; i < 4; i++) {
+      var c = (raw.cars && raw.cars[i]) || {};
+      s.cars[i] = { driver: String(c.driver || ''), model: String(c.model || ''), notes: String(c.notes || ''), day: validDay(c.day), time: validTime(c.time) };
+    }
+    var counts = [0, 0, 0, 0];
+    (Array.isArray(raw.passengers) ? raw.passengers : []).forEach(function (p) {
+      if (!p || typeof p !== 'object') return;
+      var car = (typeof p.car === 'number' && p.car >= 0 && p.car < 4) ? p.car : null;
+      if (car !== null) { if (counts[car] >= SEATS) car = null; else counts[car]++; }
+      s.passengers.push({ id: String(p.id || uid()), name: String(p.name || ''), day: validDay(p.day), time: validTime(p.time), car: car });
+    });
+    s.updatedAt = (typeof raw.updatedAt === 'number' && raw.updatedAt > 0) ? raw.updatedAt : 0;
+    return s;
+  }
+
+  var state = blankState();
+  try { state = sanitize(JSON.parse(localStorage.getItem(KEY) || 'null')); } catch (e) { state = blankState(); }
+  function cache() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable */ } }
+  function save() { state.updatedAt = Date.now(); lastEdit = Date.now(); cache(); schedulePush(); }
+
+  // ---------- Online sync (one shared board for everyone) ----------
+  var syncEl = document.getElementById('sync');
+  var pushTimer = null, pushing = false, dirty = false, lastEdit = 0, pendingRemote = null, pollTimer = null;
+  function setSync(cls, msg) { syncEl.className = 'sync ' + cls; syncEl.textContent = msg; }
+  function clock() { var d = new Date(); return (d.getHours() < 10 ? '0' : '') + d.getHours() + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes(); }
+  function schedulePush() { dirty = true; setSync('', '☁️ Saving…'); clearTimeout(pushTimer); pushTimer = setTimeout(push, 1200); }
+  function push() {
+    if (pushing) { clearTimeout(pushTimer); pushTimer = setTimeout(push, 800); return; }
+    pushing = true; dirty = false;
+    var body = 'payload=' + encodeURIComponent(JSON.stringify(state));
+    fetch(SYNC_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+      .then(function () { pushing = false; if (dirty) schedulePush(); else setSync('ok', '☁️ Saved ' + clock()); })
+      .catch(function () { pushing = false; dirty = true; setSync('err', '⚠️ Not saved yet — retrying'); clearTimeout(pushTimer); pushTimer = setTimeout(push, 8000); });
+  }
+  function isTyping() { var a = document.activeElement; return !!a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && (Date.now() - lastEdit < 4000 || a.tagName === 'TEXTAREA'); }
+  var booted = false; // until the first successful pull, the shared board always wins over a stale local copy
+  function applyRemote(remote) {
+    if (dirty || pushing) return;                       // our own changes are on their way and carry a newer stamp
+    if (booted && remote.updatedAt <= state.updatedAt) return; // nothing new
+    if (isTyping()) { pendingRemote = remote; return; } // never pull a field out from under someone's fingers
+    pendingRemote = null; state = remote; cache(); render(); setSync('ok', (booted ? '☁️ Updated ' : '☁️ Up to date ') + clock());
+  }
+  function pull() {
+    if (navigator.onLine === false) { setSync('err', '📴 Offline — changes kept on this device'); return; }
+    fetch(SYNC_URL + '?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (raw) {
+        var remote = sanitize(raw);
+        if (!booted || remote.updatedAt > state.updatedAt) applyRemote(remote);
+        else if (!dirty && !pushing) setSync('ok', '☁️ Up to date ' + clock());
+        booted = true;
+        if (dirty && !pushing) push();                  // unsent changes (e.g. just came back online)
+      })
+      .catch(function () { if (!dirty) setSync('err', '⚠️ Cannot reach the shared board — showing the last copy'); });
+  }
+  function startPolling() { clearInterval(pollTimer); pollTimer = setInterval(function () { if (document.visibilityState === 'visible') pull(); }, 60000); }
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') pull(); });
+  window.addEventListener('focus', pull);
+  window.addEventListener('online', pull);
+  document.addEventListener('focusout', function () { if (pendingRemote) setTimeout(function () { if (pendingRemote && !isTyping()) applyRemote(pendingRemote); }, 200); });
+  window.addEventListener('pagehide', function () {
+    if (!dirty && !pushing) return;
+    try { navigator.sendBeacon(SYNC_URL, new Blob(['payload=' + encodeURIComponent(JSON.stringify(state))], { type: 'application/x-www-form-urlencoded' })); } catch (e) {}
+  });
+
+  function passengersOf(ci) { return state.passengers.filter(function (p) { return p.car === ci; }); }
+  function freeSeats(ci) { return SEATS - passengersOf(ci).length; }
+  function findP(id) { for (var i = 0; i < state.passengers.length; i++) if (state.passengers[i].id === id) return state.passengers[i]; return null; }
+
+  // ---------- DOM helpers ----------
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  var carsEl = document.getElementById('cars');
+  var waitingEl = document.getElementById('waiting');
+  var waitingGrid = document.getElementById('waiting-grid');
+
+  // ---------- Bubble builder ----------
+  function dayToggle(obj) {
+    var t = el('div', 'day-toggle');
+    var b23 = el('button', obj.day === '23' ? 'on23' : '', 'Wed 23'); b23.type = 'button';
+    var b24 = el('button', obj.day === '24' ? 'on24' : '', 'Thu 24'); b24.type = 'button';
+    b23.setAttribute('aria-pressed', obj.day === '23'); b24.setAttribute('aria-pressed', obj.day === '24');
+    b23.addEventListener('click', function () { obj.day = obj.day === '23' ? '' : '23'; b23.className = obj.day ? 'on23' : ''; b24.className = ''; b23.setAttribute('aria-pressed', !!obj.day); b24.setAttribute('aria-pressed', false); save(); refresh(); });
+    b24.addEventListener('click', function () { obj.day = obj.day === '24' ? '' : '24'; b24.className = obj.day ? 'on24' : ''; b23.className = ''; b24.setAttribute('aria-pressed', !!obj.day); b23.setAttribute('aria-pressed', false); save(); refresh(); });
+    t.appendChild(b23); t.appendChild(b24);
+    return t;
+  }
+  function timeInput(obj) {
+    var time = document.createElement('input');
+    time.type = 'time'; time.value = obj.time; time.setAttribute('aria-label', 'Landing time');
+    var upd = function () { obj.time = time.value; save(); refresh(); };
+    time.addEventListener('input', upd); time.addEventListener('change', upd);
+    return time;
+  }
+
+  function driverBubble(car, ci) {
+    var b = el('div', 'bubble driver');
+    b.appendChild(el('div', 'emoji', '🔑'));
+    var name = document.createElement('input');
+    name.type = 'text'; name.className = 'name'; name.placeholder = 'Driver'; name.value = car.driver; name.autocomplete = 'off';
+    name.setAttribute('aria-label', 'Car ' + (ci + 1) + ' driver');
+    name.addEventListener('input', function () { car.driver = name.value; var h = carsEl.querySelector('[data-driver-head="' + ci + '"]'); if (h) h.value = name.value; save(); refresh(); });
+    b.appendChild(name);
+    b.appendChild(el('div', 'tools'));
+    var meta = el('div', 'meta');
+    meta.appendChild(el('span', 'lands', '🛬 lands'));
+    meta.appendChild(dayToggle(car));
+    meta.appendChild(timeInput(car));
+    b.appendChild(meta);
+    b.dataset.driverOf = ci;
+    return b;
+  }
+
+  function passengerBubble(p) {
+    var b = el('div', 'bubble passenger');
+    b.dataset.id = p.id;
+    b.appendChild(el('div', 'emoji', '🧳'));
+    var name = document.createElement('input');
+    name.type = 'text'; name.className = 'name'; name.placeholder = 'Passenger name'; name.value = p.name; name.autocomplete = 'off';
+    name.setAttribute('aria-label', 'Passenger name');
+    name.addEventListener('input', function () { p.name = name.value; save(); refresh(); });
+    b.appendChild(name);
+
+    var tools = el('div', 'tools');
+    var handle = el('span', 'handle', '⠿'); handle.title = 'Drag to a car'; handle.setAttribute('aria-hidden', 'true');
+    handle.draggable = true;
+    handle.addEventListener('dragstart', function (e) { dragId = p.id; b.classList.add('dragging'); try { e.dataTransfer.setData('text/plain', p.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setDragImage(b, 20, 20); } catch (err) {} });
+    handle.addEventListener('dragend', function () { dragId = null; b.classList.remove('dragging'); clearOver(); });
+    handle.addEventListener('touchstart', function (e) { touchStart(e, p, b); }, { passive: false });
+    tools.appendChild(handle);
+    var del = el('button', 'del', '✕'); del.type = 'button'; del.title = 'Remove this passenger'; del.setAttribute('aria-label', 'Remove ' + (p.name || 'passenger'));
+    del.addEventListener('click', function () {
+      if (p.name.trim() && !confirm('Remove ' + p.name.trim() + ' from the list?')) return;
+      state.passengers = state.passengers.filter(function (x) { return x.id !== p.id; });
+      save(); render();
+    });
+    tools.appendChild(del);
+    b.appendChild(tools);
+
+    var meta = el('div', 'meta');
+    meta.appendChild(el('span', 'lands', '🛬'));
+    meta.appendChild(dayToggle(p));
+    meta.appendChild(timeInput(p));
+    var mv = document.createElement('select'); mv.className = 'move'; mv.setAttribute('aria-label', 'Move to');
+    var o0 = document.createElement('option'); o0.value = 'wait'; o0.textContent = p.car === null ? '📍 Waiting' : '↩ Move to waiting'; mv.appendChild(o0);
+    for (var ci = 0; ci < 4; ci++) {
+      var o = document.createElement('option'); o.value = String(ci);
+      var full = freeSeats(ci) === 0 && p.car !== ci;
+      var dn = state.cars[ci].driver.trim();
+      o.textContent = (p.car === ci ? '📍 ' : '→ ') + 'Car ' + (ci + 1) + (dn ? ' (' + dn + ')' : '') + (full ? ' · full' : '');
+      o.disabled = full;
+      mv.appendChild(o);
+    }
+    mv.value = p.car === null ? 'wait' : String(p.car);
+    mv.addEventListener('change', function () { moveTo(p.id, mv.value === 'wait' ? null : parseInt(mv.value, 10)); });
+    meta.appendChild(mv);
+    b.appendChild(meta);
+    return b;
+  }
+
+  // ---------- Moving ----------
+  function moveTo(id, ci) {
+    var p = findP(id); if (!p) return;
+    if (ci !== null && freeSeats(ci) === 0 && p.car !== ci) { toast('🚫 Car ' + (ci + 1) + ' is full.'); render(); return; }
+    p.car = ci; save(); render();
+    toast(ci === null ? '↩ Back to waiting.' : '🚗 ' + (p.name.trim() || 'Passenger') + ' → Car ' + (ci + 1));
+  }
+
+  var dragId = null;
+  function clearOver() { document.querySelectorAll('.over').forEach(function (e) { e.classList.remove('over'); }); }
+  function makeDropZone(zone, ci) {
+    zone.addEventListener('dragover', function (e) { if (dragId === null) return; if (ci !== null && freeSeats(ci) === 0 && findP(dragId).car !== ci) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; zone.classList.add('over'); });
+    zone.addEventListener('dragleave', function (e) { if (!zone.contains(e.relatedTarget)) zone.classList.remove('over'); });
+    zone.addEventListener('drop', function (e) { e.preventDefault(); var id = dragId || e.dataTransfer.getData('text/plain'); zone.classList.remove('over'); if (id) moveTo(id, ci); });
+    zone.dataset.zone = ci === null ? 'wait' : String(ci);
+  }
+
+  // Touch drag (phones): move a ghost, drop on the zone under the finger.
+  function touchStart(e, p, bubble) {
+    e.preventDefault();
+    var ghost = bubble.cloneNode(true); ghost.classList.add('ghost'); ghost.classList.remove('dragging');
+    document.body.appendChild(ghost);
+    bubble.classList.add('dragging');
+    var lastZone = null;
+    function pos(ev) { var t = ev.touches[0] || ev.changedTouches[0]; ghost.style.left = t.clientX + 'px'; ghost.style.top = t.clientY + 'px'; return t; }
+    function zoneAt(t) { ghost.style.display = 'none'; var target = document.elementFromPoint(t.clientX, t.clientY); ghost.style.display = ''; return target ? target.closest('[data-zone]') : null; }
+    function move(ev) { ev.preventDefault(); var t = pos(ev); var z = zoneAt(t); if (z !== lastZone) { clearOver(); lastZone = z; if (z) z.classList.add('over'); } }
+    function end(ev) {
+      document.removeEventListener('touchmove', move); document.removeEventListener('touchend', end); document.removeEventListener('touchcancel', end);
+      var t = ev.changedTouches[0]; var z = zoneAt(t);
+      ghost.remove(); bubble.classList.remove('dragging'); clearOver();
+      if (z) { var v = z.dataset.zone; moveTo(p.id, v === 'wait' ? null : parseInt(v, 10)); }
+    }
+    pos(e);
+    document.addEventListener('touchmove', move, { passive: false });
+    document.addEventListener('touchend', end); document.addEventListener('touchcancel', end);
+  }
+
+  // ---------- Render ----------
+  function render() {
+    var active = document.activeElement;
+    carsEl.innerHTML = '';
+    state.cars.forEach(function (car, ci) {
+      var root = el('section', 'car');
+      root.style.setProperty('--car', CAR_COLORS[ci]);
+      root.setAttribute('aria-label', 'Car ' + (ci + 1));
+
+      var head = el('div', 'car-head');
+      var eyebrow = el('div', 'eyebrow');
+      eyebrow.appendChild(el('span', null, '🚗 Car ' + (ci + 1)));
+      var badge = el('span', 'seats-badge'); badge.dataset.badge = ci;
+      eyebrow.appendChild(badge);
+      head.appendChild(eyebrow);
+
+      var driverIn = document.createElement('input');
+      driverIn.type = 'text'; driverIn.className = 'driver-name'; driverIn.placeholder = 'Driver name'; driverIn.value = car.driver; driverIn.autocomplete = 'off';
+      driverIn.dataset.driverHead = ci; driverIn.setAttribute('aria-label', 'Car ' + (ci + 1) + ' driver name');
+      driverIn.addEventListener('input', function () { car.driver = driverIn.value; var b = carsEl.querySelector('[data-driver-of="' + ci + '"] .name'); if (b) b.value = driverIn.value; save(); refresh(); });
+      head.appendChild(driverIn);
+
+      var modelIn = document.createElement('input');
+      modelIn.type = 'text'; modelIn.className = 'car-model'; modelIn.placeholder = 'Rental car (e.g. Fiat 500, white)'; modelIn.value = car.model; modelIn.autocomplete = 'off';
+      modelIn.setAttribute('aria-label', 'Car ' + (ci + 1) + ' model');
+      modelIn.addEventListener('input', function () { car.model = modelIn.value; save(); });
+      head.appendChild(modelIn);
+
+      var dots = el('div', 'seat-dots'); dots.dataset.dots = ci;
+      for (var d = 0; d < SEATS; d++) dots.appendChild(el('span'));
+      head.appendChild(dots);
+      root.appendChild(head);
+
+      var slots = el('div', 'slots');
+      slots.appendChild(driverBubble(car, ci));
+      var ps = passengersOf(ci);
+      ps.forEach(function (p) { slots.appendChild(passengerBubble(p)); });
+      for (var k = ps.length; k < SEATS; k++) slots.appendChild(el('div', 'empty-slot', '💺 Free seat — drop a passenger here'));
+      makeDropZone(slots, ci);
+      root.appendChild(slots);
+
+      var notes = el('div', 'notes');
+      var lab = el('label', null, '🕐 Driver availability'); lab.htmlFor = 'notes-' + ci;
+      var ta = document.createElement('textarea'); ta.id = 'notes-' + ci;
+      ta.placeholder = 'When do you pick up the car? Which hours can you do airport runs and drive people to the venue?';
+      ta.value = car.notes;
+      ta.addEventListener('input', function () { car.notes = ta.value; save(); });
+      notes.appendChild(lab); notes.appendChild(ta);
+      root.appendChild(notes);
+      carsEl.appendChild(root);
+    });
+
+    waitingGrid.innerHTML = '';
+    var waiting = state.passengers.filter(function (p) { return p.car === null; });
+    if (!waiting.length) waitingGrid.appendChild(el('div', 'none', 'Nobody is waiting. 🎉'));
+    waiting.forEach(function (p) { waitingGrid.appendChild(passengerBubble(p)); });
+    if (!waitingEl.dataset.zone) makeDropZone(waitingEl, null);
+
+    refresh();
+    if (active && active.id) { var again = document.getElementById(active.id); if (again) again.focus(); }
+  }
+
+  // Derived UI only (badges, counts, timeline); never rebuilds inputs.
+  function refresh() {
+    var totalFree = 0, n23 = 0, n24 = 0;
+    state.cars.forEach(function (car, ci) {
+      var free = freeSeats(ci); totalFree += free;
+      var badge = carsEl.querySelector('[data-badge="' + ci + '"]');
+      if (badge) { badge.textContent = free === 0 ? 'Full' : '💺 ' + free + ' free'; badge.className = 'seats-badge' + (free === 0 ? ' full' : ''); }
+      var dots = carsEl.querySelector('[data-dots="' + ci + '"]');
+      if (dots) Array.prototype.forEach.call(dots.children, function (d, i) { d.className = i < SEATS - free ? 'taken' : ''; });
+      if (car.driver.trim()) { if (car.day === '23') n23++; if (car.day === '24') n24++; }
+    });
+    state.passengers.forEach(function (p) {
+      if (p.day === '23') n23++; if (p.day === '24') n24++;
+      var b = document.querySelector('.bubble[data-id="' + p.id + '"]');
+      if (b) b.classList.toggle('incomplete', !p.name.trim() || !p.day || !p.time);
+    });
+    var waiting = state.passengers.filter(function (p) { return p.car === null; }).length;
+    document.getElementById('s-free').textContent = totalFree;
+    document.getElementById('s-23').textContent = n23;
+    document.getElementById('s-24').textContent = n24;
+    document.getElementById('s-wait').textContent = waiting;
+    document.getElementById('stat-waiting').classList.toggle('none', waiting === 0);
+    waitingEl.classList.toggle('has', waiting > 0);
+    renderTimeline();
+  }
+
+  function collect() {
+    var list = [];
+    state.cars.forEach(function (car, ci) {
+      if (car.driver.trim()) list.push({ name: car.driver.trim(), day: car.day, time: car.time, car: ci, driver: true });
+    });
+    state.passengers.forEach(function (p) {
+      list.push({ name: p.name.trim() || '(no name)', day: p.day, time: p.time, car: p.car, driver: false });
+    });
+    return list;
+  }
+  function byTime(a, b) { return (a.time || '99:99') < (b.time || '99:99') ? -1 : 1; }
+
+  function renderTimeline() {
+    var all = collect();
+    ['23', '24'].forEach(function (day) {
+      var ul = document.getElementById('list-' + day);
+      ul.innerHTML = '';
+      var rows = all.filter(function (x) { return x.day === day; }).sort(byTime);
+      if (!rows.length) { ul.appendChild(el('li', 'empty', 'Nobody yet')); return; }
+      rows.forEach(function (x) {
+        var li = el('li', x.car === null ? 'nocar' : '');
+        if (x.car !== null) li.style.setProperty('--car', CAR_COLORS[x.car]);
+        li.appendChild(el('span', 't' + (x.time ? '' : ' none'), x.time || 'time?'));
+        li.appendChild(el('span', 'who', (x.driver ? '🔑 ' : '🧳 ') + x.name));
+        var tag = x.car === null ? '🙋 no car yet' : 'Car ' + (x.car + 1) + (!x.driver && state.cars[x.car].driver.trim() ? ' · ' + state.cars[x.car].driver.trim() : '');
+        li.appendChild(el('span', 'car-tag', tag));
+        ul.appendChild(li);
+      });
+    });
+    var noDay = all.filter(function (x) { return !x.day; }).map(function (x) { return x.name; });
+    var unset = document.getElementById('unset');
+    unset.innerHTML = '';
+    if (noDay.length) { unset.appendChild(el('span', null, '⚠️ Arrival day not set for: ')); unset.appendChild(el('strong', null, noDay.join(', '))); }
+  }
+
+  // ---------- Export text ----------
+  function fmtPerson(name, day, time, isDriver) {
+    var s = (isDriver ? '🔑 ' : '🧳 ') + name;
+    var bits = [];
+    if (day) bits.push(DAYS[day] + ' Sept');
+    if (time) bits.push('lands ' + time);
+    if (bits.length) s += ' — ' + bits.join(', ');
+    return s;
+  }
+  function exportText() {
+    var lines = ['🛬 ROME AIRPORT RIDES — Wed 23 & Thu 24 Sept', 'Fiumicino ✈️ → the venue (about 30 min)', ''];
+    state.cars.forEach(function (car, ci) {
+      var free = freeSeats(ci);
+      lines.push('🚗 CAR ' + (ci + 1) + (car.model.trim() ? ' · ' + car.model.trim() : ''));
+      lines.push(car.driver.trim() ? fmtPerson(car.driver.trim(), car.day, car.time, true) : '🔑 Driver: (to be confirmed)');
+      passengersOf(ci).forEach(function (p) { lines.push(fmtPerson(p.name.trim() || '(no name)', p.day, p.time, false)); });
+      lines.push(free === 0 ? '💺 Full' : '💺 ' + free + ' seat' + (free > 1 ? 's' : '') + ' free');
+      if (car.notes.trim()) lines.push('🕐 Availability: ' + car.notes.trim().replace(/\s*\n+\s*/g, ' / '));
+      lines.push('');
+    });
+    var waiting = state.passengers.filter(function (p) { return p.car === null; });
+    lines.push('🙋 WAITING FOR A SEAT — ' + waiting.length);
+    if (!waiting.length) lines.push('  (nobody)');
+    waiting.forEach(function (p) { lines.push('  ' + fmtPerson(p.name.trim() || '(no name)', p.day, p.time, false)); });
+    lines.push('');
+    var all = collect();
+    ['23', '24'].forEach(function (day) {
+      var rows = all.filter(function (x) { return x.day === day; }).sort(byTime);
+      lines.push('📅 ' + DAYS[day].toUpperCase() + ' SEPT — ' + rows.length + ' arriving');
+      rows.forEach(function (x) { lines.push('  ' + (x.time || '??:??') + '  ' + x.name + (x.car === null ? ' → no car yet' : ' → Car ' + (x.car + 1))); });
+      if (!rows.length) lines.push('  (nobody yet)');
+      lines.push('');
+    });
+    var noDay = all.filter(function (x) { return !x.day; }).map(function (x) { return x.name; });
+    if (noDay.length) lines.push('⚠️ Arrival day missing: ' + noDay.join(', '));
+    var totalFree = [0, 1, 2, 3].reduce(function (n, ci) { return n + freeSeats(ci); }, 0);
+    lines.push('💺 Total seats free: ' + totalFree + ' of 16');
+    return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  // ---------- Clipboard / modal / toast ----------
+  var toastEl = document.getElementById('toast'), toastTimer;
+  function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2200); }
+
+  var modal = document.getElementById('modal'), mTitle = document.getElementById('modal-title'), mText = document.getElementById('modal-text'),
+      mArea = document.getElementById('modal-area'), mOk = document.getElementById('modal-ok'), mCancel = document.getElementById('modal-cancel');
+  var modalOnOk = null;
+  function openModal(title, text, value, okLabel, onOk, readOnly) {
+    mTitle.textContent = title; mText.textContent = text; mArea.value = value; mArea.readOnly = !!readOnly;
+    mOk.textContent = okLabel; modalOnOk = onOk; modal.classList.add('open');
+    setTimeout(function () { mArea.focus(); if (readOnly) mArea.select(); }, 30);
+  }
+  function closeModal() { modal.classList.remove('open'); modalOnOk = null; }
+  mCancel.addEventListener('click', closeModal);
+  modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && modal.classList.contains('open')) closeModal(); });
+  mOk.addEventListener('click', function () { if (modalOnOk) modalOnOk(mArea.value); });
+
+  function legacyCopy(text) {
+    try {
+      var ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+      var ok = document.execCommand('copy'); document.body.removeChild(ta); return ok;
+    } catch (e) { return false; }
+  }
+  function copyText(text, okMsg, fallbackTitle) {
+    var done = function () { toast(okMsg); };
+    var fail = function () { openModal(fallbackTitle, 'Copying automatically is not allowed here. Select the text below and copy it yourself.', text, 'Done', closeModal, true); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { legacyCopy(text) ? done() : fail(); });
+    } else { legacyCopy(text) ? done() : fail(); }
+  }
+
+  // ---------- Buttons ----------
+  function addPassenger() {
+    var p = { id: uid(), name: '', day: '', time: '', car: null };
+    state.passengers.push(p); save(); render();
+    var b = document.querySelector('.bubble[data-id="' + p.id + '"]');
+    if (b) { b.scrollIntoView({ block: 'center', behavior: 'smooth' }); var n = b.querySelector('.name'); if (n) n.focus(); }
+  }
+  document.getElementById('btn-add').addEventListener('click', addPassenger);
+  document.getElementById('btn-add-2').addEventListener('click', addPassenger);
+
+  document.getElementById('btn-export').addEventListener('click', function () {
+    copyText(exportText(), '📋 Copied! Paste it in WhatsApp.', 'Text for WhatsApp');
+  });
+
+  document.getElementById('btn-reset').addEventListener('click', function () {
+    if (!confirm('Clear every name, time and note on the SHARED board? Everyone in the group will lose what is here.')) return;
+    state = blankState(); save(); render(); toast('🗑️ Cleared.');
+  });
+
+  render();
+  pull();
+  startPolling();
+})();
+</script>
+</body>
+</html>
