@@ -190,17 +190,10 @@
   .unset { margin-top: 10px; font-size: 13px; color: var(--ink-soft); }
   .unset strong { color: var(--ink); }
 
-  /* ---------- Footer / toast / modal ---------- */
+  /* ---------- Footer / toast ---------- */
   footer { margin-top: 18px; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
   .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-weight: 700; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; box-shadow: var(--shadow); z-index: 30; max-width: 92vw; text-align: center; }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 20; }
-  .modal.open { display: flex; }
-  .modal .box { background: var(--surface); color: var(--ink); border-radius: 14px; padding: 16px; width: min(640px, 100%); max-height: 90vh; display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow); }
-  .modal h2 { margin: 0; font-size: 17px; }
-  .modal p { margin: 0; font-size: 14px; color: var(--ink-soft); }
-  .modal textarea { width: 100%; min-height: 240px; font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; padding: 10px; border-radius: 10px; border: 1px solid var(--field-border); background: var(--field); color: var(--ink); resize: vertical; }
-  .modal .row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
   .ghost { position: fixed; pointer-events: none; z-index: 40; opacity: .9; transform: translate(-50%, -50%) rotate(-2deg); box-shadow: 0 10px 30px rgba(0,0,0,.25); width: 240px; }
   @media (prefers-reduced-motion: reduce) { .toast { transition: none; } button:active { transform: none; } }
 </style>
@@ -212,8 +205,6 @@
     <div class="actions">
       <span class="sync" id="sync" role="status" aria-live="polite">☁️ Connecting…</span>
       <button type="button" id="btn-add" class="primary">➕ Add a passenger</button>
-      <button type="button" id="btn-export">📋 Copy for WhatsApp</button>
-      <button type="button" id="btn-reset">🗑️ Clear all</button>
     </div>
   </header>
 
@@ -248,23 +239,11 @@
   </section>
 
   <footer>
-    🔑 = driver · 🧳 = passenger · ⠿ = drag handle. This is one shared board: what you type is saved online within a second or two, and everyone who opens the link sees the same thing. If you are offline, your changes stay on this device and are sent as soon as you are back. <strong>Copy for WhatsApp</strong> gives you the whole board as plain text.
+    🔑 = driver · 🧳 = passenger · ⠿ = drag handle. This is one shared board: what you type is saved online within a second or two, and everyone who opens the link sees the same thing. If you are offline, your changes stay on this device and are sent as soon as you are back. To leave a car, use the “Move to waiting” option; the ✕ removes a passenger for everyone.
   </footer>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-
-<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-  <div class="box">
-    <h2 id="modal-title">Title</h2>
-    <p id="modal-text"></p>
-    <textarea id="modal-area" spellcheck="false"></textarea>
-    <div class="row">
-      <button type="button" id="modal-cancel">Close</button>
-      <button type="button" id="modal-ok" class="primary">OK</button>
-    </div>
-  </div>
-</div>
 
 <script>
 (function () {
@@ -606,78 +585,9 @@
     if (noDay.length) { unset.appendChild(el('span', null, '⚠️ Arrival day not set for: ')); unset.appendChild(el('strong', null, noDay.join(', '))); }
   }
 
-  // ---------- Export text ----------
-  function fmtPerson(name, day, time, isDriver) {
-    var s = (isDriver ? '🔑 ' : '🧳 ') + name;
-    var bits = [];
-    if (day) bits.push(DAYS[day] + ' Sept');
-    if (time) bits.push('lands ' + time);
-    if (bits.length) s += ' — ' + bits.join(', ');
-    return s;
-  }
-  function exportText() {
-    var lines = ['🛬 ROME AIRPORT RIDES — Wed 23 & Thu 24 Sept', 'Fiumicino ✈️ → the venue (about 30 min)', ''];
-    state.cars.forEach(function (car, ci) {
-      var free = freeSeats(ci);
-      lines.push('🚗 CAR ' + (ci + 1) + (car.model.trim() ? ' · ' + car.model.trim() : ''));
-      lines.push(car.driver.trim() ? fmtPerson(car.driver.trim(), car.day, car.time, true) : '🔑 Driver: (to be confirmed)');
-      passengersOf(ci).forEach(function (p) { lines.push(fmtPerson(p.name.trim() || '(no name)', p.day, p.time, false)); });
-      lines.push(free === 0 ? '💺 Full' : '💺 ' + free + ' seat' + (free > 1 ? 's' : '') + ' free');
-      if (car.notes.trim()) lines.push('🕐 Availability: ' + car.notes.trim().replace(/\s*\n+\s*/g, ' / '));
-      lines.push('');
-    });
-    var waiting = state.passengers.filter(function (p) { return p.car === null; });
-    lines.push('🙋 WAITING FOR A SEAT — ' + waiting.length);
-    if (!waiting.length) lines.push('  (nobody)');
-    waiting.forEach(function (p) { lines.push('  ' + fmtPerson(p.name.trim() || '(no name)', p.day, p.time, false)); });
-    lines.push('');
-    var all = collect();
-    ['23', '24'].forEach(function (day) {
-      var rows = all.filter(function (x) { return x.day === day; }).sort(byTime);
-      lines.push('📅 ' + DAYS[day].toUpperCase() + ' SEPT — ' + rows.length + ' arriving');
-      rows.forEach(function (x) { lines.push('  ' + (x.time || '??:??') + '  ' + x.name + (x.car === null ? ' → no car yet' : ' → Car ' + (x.car + 1))); });
-      if (!rows.length) lines.push('  (nobody yet)');
-      lines.push('');
-    });
-    var noDay = all.filter(function (x) { return !x.day; }).map(function (x) { return x.name; });
-    if (noDay.length) lines.push('⚠️ Arrival day missing: ' + noDay.join(', '));
-    var totalFree = [0, 1, 2, 3].reduce(function (n, ci) { return n + freeSeats(ci); }, 0);
-    lines.push('💺 Total seats free: ' + totalFree + ' of 16');
-    return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
-  }
-
-  // ---------- Clipboard / modal / toast ----------
+  // ---------- Toast ----------
   var toastEl = document.getElementById('toast'), toastTimer;
   function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2200); }
-
-  var modal = document.getElementById('modal'), mTitle = document.getElementById('modal-title'), mText = document.getElementById('modal-text'),
-      mArea = document.getElementById('modal-area'), mOk = document.getElementById('modal-ok'), mCancel = document.getElementById('modal-cancel');
-  var modalOnOk = null;
-  function openModal(title, text, value, okLabel, onOk, readOnly) {
-    mTitle.textContent = title; mText.textContent = text; mArea.value = value; mArea.readOnly = !!readOnly;
-    mOk.textContent = okLabel; modalOnOk = onOk; modal.classList.add('open');
-    setTimeout(function () { mArea.focus(); if (readOnly) mArea.select(); }, 30);
-  }
-  function closeModal() { modal.classList.remove('open'); modalOnOk = null; }
-  mCancel.addEventListener('click', closeModal);
-  modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && modal.classList.contains('open')) closeModal(); });
-  mOk.addEventListener('click', function () { if (modalOnOk) modalOnOk(mArea.value); });
-
-  function legacyCopy(text) {
-    try {
-      var ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', '');
-      ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
-      var ok = document.execCommand('copy'); document.body.removeChild(ta); return ok;
-    } catch (e) { return false; }
-  }
-  function copyText(text, okMsg, fallbackTitle) {
-    var done = function () { toast(okMsg); };
-    var fail = function () { openModal(fallbackTitle, 'Copying automatically is not allowed here. Select the text below and copy it yourself.', text, 'Done', closeModal, true); };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(done, function () { legacyCopy(text) ? done() : fail(); });
-    } else { legacyCopy(text) ? done() : fail(); }
-  }
 
   // ---------- Buttons ----------
   function addPassenger() {
@@ -688,15 +598,6 @@
   }
   document.getElementById('btn-add').addEventListener('click', addPassenger);
   document.getElementById('btn-add-2').addEventListener('click', addPassenger);
-
-  document.getElementById('btn-export').addEventListener('click', function () {
-    copyText(exportText(), '📋 Copied! Paste it in WhatsApp.', 'Text for WhatsApp');
-  });
-
-  document.getElementById('btn-reset').addEventListener('click', function () {
-    if (!confirm('Clear every name, time and note on the SHARED board? Everyone in the group will lose what is here.')) return;
-    state = blankState(); save(); render(); toast('🗑️ Cleared.');
-  });
 
   render();
   pull();
