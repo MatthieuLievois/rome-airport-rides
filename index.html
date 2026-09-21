@@ -29,6 +29,7 @@
     --car3: #2c5aa0;
     --car4: #b8860b;
     --wait: #8a8177;
+    --taxi: #b7791f;
     --shadow: 0 1px 2px rgba(43,38,32,.06), 0 6px 18px rgba(43,38,32,.07);
   }
   @media (prefers-color-scheme: dark) {
@@ -56,6 +57,7 @@
       --car3: #4b7bc8;
       --car4: #d2a12a;
       --wait: #a89e92;
+      --taxi: #f0c05a;
       --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.3);
     }
   }
@@ -168,6 +170,11 @@
   .pool .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 8px; min-height: 48px; }
   .pool .none { color: var(--ink-soft); font-size: 14px; padding: 8px 2px; }
   .pool .bubble.passenger { border-left-color: var(--wait); }
+  .pool.taxi { --car: var(--taxi); border-style: solid; border-color: color-mix(in srgb, var(--taxi) 45%, transparent); }
+  .pool.taxi.over { background: color-mix(in srgb, var(--taxi) 12%, transparent); }
+  .pool.taxi .bubble.passenger { border-left-color: var(--taxi); }
+  .stat.taxi { border-left-color: var(--taxi); }
+  .arrivals li.taxi { --car: var(--taxi); }
 
   /* ---------- Arrivals timeline ---------- */
   .timeline { margin-top: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 14px; }
@@ -211,6 +218,7 @@
   <section class="summary" aria-label="Summary">
     <div class="stat seats"><div class="label">💺 Seats free</div><div class="value"><span id="s-free">16</span><span class="sub">of 16</span></div></div>
     <div class="stat waiting none" id="stat-waiting"><div class="label">🙋 Waiting for a seat</div><div class="value"><span id="s-wait">0</span></div></div>
+    <div class="stat taxi"><div class="label">🚕 Taking a taxi</div><div class="value"><span id="s-taxi">0</span></div></div>
     <div class="stat d23"><div class="label">Wed 23 Sept</div><div class="value"><span id="s-23">0</span><span class="sub">arriving</span></div></div>
     <div class="stat d24"><div class="label">Thu 24 Sept</div><div class="value"><span id="s-24">0</span><span class="sub">arriving</span></div></div>
   </section>
@@ -228,6 +236,16 @@
     <div class="grid" id="waiting-grid"></div>
   </section>
 
+  <section class="pool taxi" id="taxi" aria-label="Passengers taking a taxi">
+    <div class="head">
+      <div>
+        <h2>🚕 Taking a taxi</h2>
+        <p class="hint">Not riding in one of the four cars? Drag your bubble here, or pick “Taxi” in the “Move to” menu. You stay in the landing timeline, so others landing around the same time can share the taxi with you.</p>
+      </div>
+    </div>
+    <div class="grid" id="taxi-grid"></div>
+  </section>
+
   <section class="timeline" aria-label="Arrivals timeline">
     <h2>🕐 Who lands when</h2>
     <p class="hint">Everyone sorted by landing time, with their car. Check that a driver is around for each landing.</p>
@@ -239,7 +257,7 @@
   </section>
 
   <footer>
-    🔑 = driver · 🧳 = passenger · ⠿ = drag handle. This is one shared board: what you type is saved online within a second or two, and everyone who opens the link sees the same thing. If you are offline, your changes stay on this device and are sent as soon as you are back. To leave a car, use the “Move to waiting” option; the ✕ removes a passenger for everyone.
+    🔑 = driver · 🧳 = passenger · ⠿ = drag handle. This is one shared board: what you type is saved online within a second or two, and everyone who opens the link sees the same thing. If you are offline, your changes stay on this device and are sent as soon as you are back. To leave a car, use the “Move to waiting” option, or “Taxi” if you are taking a taxi; the ✕ removes a passenger for everyone.
   </footer>
 </div>
 
@@ -271,7 +289,7 @@
     var counts = [0, 0, 0, 0];
     (Array.isArray(raw.passengers) ? raw.passengers : []).forEach(function (p) {
       if (!p || typeof p !== 'object') return;
-      var car = (typeof p.car === 'number' && p.car >= 0 && p.car < 4) ? p.car : null;
+      var car = p.car === 'taxi' ? 'taxi' : ((typeof p.car === 'number' && p.car >= 0 && p.car < 4) ? p.car : null);
       if (car !== null) { if (counts[car] >= SEATS) car = null; else counts[car]++; }
       s.passengers.push({ id: String(p.id || uid()), name: String(p.name || ''), day: validDay(p.day), time: validTime(p.time), car: car });
     });
@@ -339,6 +357,8 @@
   var carsEl = document.getElementById('cars');
   var waitingEl = document.getElementById('waiting');
   var waitingGrid = document.getElementById('waiting-grid');
+  var taxiEl = document.getElementById('taxi');
+  var taxiGrid = document.getElementById('taxi-grid');
 
   // ---------- Bubble builder ----------
   function dayToggle(obj) {
@@ -417,25 +437,27 @@
       o.disabled = full;
       mv.appendChild(o);
     }
+    var ot = document.createElement('option'); ot.value = 'taxi'; ot.textContent = (p.car === 'taxi' ? '📍 ' : '→ ') + '🚕 Taxi'; mv.appendChild(ot);
     mv.value = p.car === null ? 'wait' : String(p.car);
-    mv.addEventListener('change', function () { moveTo(p.id, mv.value === 'wait' ? null : parseInt(mv.value, 10)); });
+    mv.addEventListener('change', function () { moveTo(p.id, zoneValue(mv.value)); });
     meta.appendChild(mv);
     b.appendChild(meta);
     return b;
   }
 
   // ---------- Moving ----------
+  function zoneValue(v) { return v === 'wait' ? null : (v === 'taxi' ? 'taxi' : parseInt(v, 10)); }
   function moveTo(id, ci) {
     var p = findP(id); if (!p) return;
-    if (ci !== null && freeSeats(ci) === 0 && p.car !== ci) { toast('🚫 Car ' + (ci + 1) + ' is full.'); render(); return; }
+    if (typeof ci === 'number' && freeSeats(ci) === 0 && p.car !== ci) { toast('🚫 Car ' + (ci + 1) + ' is full.'); render(); return; }
     p.car = ci; save(); render();
-    toast(ci === null ? '↩ Back to waiting.' : '🚗 ' + (p.name.trim() || 'Passenger') + ' → Car ' + (ci + 1));
+    toast(ci === null ? '↩ Back to waiting.' : (ci === 'taxi' ? '🚕 ' + (p.name.trim() || 'Passenger') + ' → Taxi' : '🚗 ' + (p.name.trim() || 'Passenger') + ' → Car ' + (ci + 1)));
   }
 
   var dragId = null;
   function clearOver() { document.querySelectorAll('.over').forEach(function (e) { e.classList.remove('over'); }); }
   function makeDropZone(zone, ci) {
-    zone.addEventListener('dragover', function (e) { if (dragId === null) return; if (ci !== null && freeSeats(ci) === 0 && findP(dragId).car !== ci) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; zone.classList.add('over'); });
+    zone.addEventListener('dragover', function (e) { if (dragId === null) return; if (typeof ci === 'number' && freeSeats(ci) === 0 && findP(dragId).car !== ci) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; zone.classList.add('over'); });
     zone.addEventListener('dragleave', function (e) { if (!zone.contains(e.relatedTarget)) zone.classList.remove('over'); });
     zone.addEventListener('drop', function (e) { e.preventDefault(); var id = dragId || e.dataTransfer.getData('text/plain'); zone.classList.remove('over'); if (id) moveTo(id, ci); });
     zone.dataset.zone = ci === null ? 'wait' : String(ci);
@@ -455,7 +477,7 @@
       document.removeEventListener('touchmove', move); document.removeEventListener('touchend', end); document.removeEventListener('touchcancel', end);
       var t = ev.changedTouches[0]; var z = zoneAt(t);
       ghost.remove(); bubble.classList.remove('dragging'); clearOver();
-      if (z) { var v = z.dataset.zone; moveTo(p.id, v === 'wait' ? null : parseInt(v, 10)); }
+      if (z) { moveTo(p.id, zoneValue(z.dataset.zone)); }
     }
     pos(e);
     document.addEventListener('touchmove', move, { passive: false });
@@ -519,6 +541,11 @@
     if (!waiting.length) waitingGrid.appendChild(el('div', 'none', 'Nobody is waiting. 🎉'));
     waiting.forEach(function (p) { waitingGrid.appendChild(passengerBubble(p)); });
     if (!waitingEl.dataset.zone) makeDropZone(waitingEl, null);
+    taxiGrid.innerHTML = '';
+    var inTaxi = state.passengers.filter(function (p) { return p.car === 'taxi'; });
+    if (!inTaxi.length) taxiGrid.appendChild(el('div', 'none', 'Nobody is taking a taxi.'));
+    inTaxi.forEach(function (p) { taxiGrid.appendChild(passengerBubble(p)); });
+    if (!taxiEl.dataset.zone) makeDropZone(taxiEl, 'taxi');
 
     refresh();
     if (active && active.id) { var again = document.getElementById(active.id); if (again) again.focus(); }
@@ -545,6 +572,7 @@
     document.getElementById('s-23').textContent = n23;
     document.getElementById('s-24').textContent = n24;
     document.getElementById('s-wait').textContent = waiting;
+    document.getElementById('s-taxi').textContent = state.passengers.filter(function (p) { return p.car === 'taxi'; }).length;
     document.getElementById('stat-waiting').classList.toggle('none', waiting === 0);
     waitingEl.classList.toggle('has', waiting > 0);
     renderTimeline();
@@ -570,11 +598,11 @@
       var rows = all.filter(function (x) { return x.day === day; }).sort(byTime);
       if (!rows.length) { ul.appendChild(el('li', 'empty', 'Nobody yet')); return; }
       rows.forEach(function (x) {
-        var li = el('li', x.car === null ? 'nocar' : '');
-        if (x.car !== null) li.style.setProperty('--car', CAR_COLORS[x.car]);
+        var li = el('li', x.car === null ? 'nocar' : (x.car === 'taxi' ? 'taxi' : ''));
+        if (typeof x.car === 'number') li.style.setProperty('--car', CAR_COLORS[x.car]);
         li.appendChild(el('span', 't' + (x.time ? '' : ' none'), x.time || 'time?'));
         li.appendChild(el('span', 'who', (x.driver ? '🔑 ' : '🧳 ') + x.name));
-        var tag = x.car === null ? '🙋 no car yet' : 'Car ' + (x.car + 1) + (!x.driver && state.cars[x.car].driver.trim() ? ' · ' + state.cars[x.car].driver.trim() : '');
+        var tag = x.car === null ? '🙋 no car yet' : x.car === 'taxi' ? '🚕 Taxi' : 'Car ' + (x.car + 1) + (!x.driver && state.cars[x.car].driver.trim() ? ' · ' + state.cars[x.car].driver.trim() : '');
         li.appendChild(el('span', 'car-tag', tag));
         ul.appendChild(li);
       });
